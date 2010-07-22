@@ -207,11 +207,27 @@ function content_moderation_nodeapi(&$node, $op, $a3, $a4) {
     case 'view':
       // We are not showing the node, possible its just a view or something.
       // Dont show all the messages below then.
-      if(arg(0) != 'node' || !is_numeric(arg(1)) || !(arg(2) == "") ) {
+      if(arg(0) != 'node' || !is_numeric(arg(1)) || !(arg(2) == "")) {
         return;
       }
 
       $live = _content_moderation_live_revision($node->nid);
+      $node_state = _content_moderation_current_state($node->vid);
+      
+      // If the user passes this, they have permission for viewing the node in its current state
+      // Also fixes #770070 since those messages will only be showed to people who should have access
+      //
+      if ( !user_access('content moderation view' . $node->type . 'state' . $node_state) ) {
+        if ($live == NULL) {
+          return;
+        }
+        else {
+          // there is a live version, is this NOT it?
+          if ($node->vid != $live->vid) {
+            return;
+          }
+        }
+      }
       // If we are showing the node, but there is no live version yet, give a hard notice.
       if($live == NULL) {
         // If this node has no live version yet, notice the user that the content is not valid.
@@ -315,6 +331,10 @@ function content_moderation_perm() {
       $to_states = array_keys($to_states);
       foreach($to_states as $to_state) {
         $rights[] = "content moderation $type state $from_state to $to_state";
+      }
+      // added to allow for granular viewing permissions
+      if ($from_state != 'live') {
+        $rights[] = "content moderation view $type state $from_state";
       }
     }
     $rights[] = "content moderation view $type moderation history";
